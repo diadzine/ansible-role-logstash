@@ -12,3 +12,8 @@
 
 - name: Install Logstash.
   yum: pkg=logstash state=installed
+
+- name: Execute system-install for Logstash.
+  command: >
+    ./bin/system-install /etc/logstash/startup.options
+    chdir={{ logstash_dir }}
