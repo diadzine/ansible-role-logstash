@@ -1,4 +1,6 @@
 ---
+logstash_dir: /usr/share/logstash
+
 logstash_listen_port_beats: 5044
 
 logstash_elasticsearch_hosts:
