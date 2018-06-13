@@ -24,6 +24,10 @@ script:
   - echo "Running container"
   - docker run --detach --privileged -v /sys/fs/cgroup:/sys/fs/cgroup:ro --volume="$PWD":/etc/ansible/roles/role_under_test:ro --name $container_id ${distribution}-${version}:ansible
 
+  # Install Ansible requirements.
+  - echo "Install Ansible requirements"
+  - docker exec --tty $container_id env ANSIBLE_FORCE_COLOR=1 ansible-galaxy install -r /etc/ansible/roles/role_under_test/tests/requirements.yml
+
   # Ansible syntax check.
   - echo "Checking role syntax"
   - docker exec --tty $container_id env ANSIBLE_FORCE_COLOR=1 ansible-playbook /etc/ansible/roles/role_under_test/tests/travis.yml --syntax-check
