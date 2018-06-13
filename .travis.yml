@@ -1,18 +1,46 @@
 ---
-services: docker
+sudo: required
+
+services:
+  - docker
 
 env:
-  - distro: centos7
-  - distro: ubuntu1604
-  - distro: ubuntu1404
+  - distribution: centos
+    version: 7
+  - distribution: ubuntu
+    version: xenial
+  - distribution: ubuntu
+    version: trusty
+
+before_install:
+  # Pull container.
+  - 'docker pull ${distribution}:${version}'
+  - 'sudo docker build --no-cache --rm --file=tests/travis/Dockerfile.${distribution}-${version} --tag=${distribution}-${version}:ansible travis'
 
 script:
-  # Download test shim.
-  - wget -O ${PWD}/tests/test.sh https://gist.githubusercontent.com/geerlingguy/73ef1e5ee45d8694570f334be385e181/raw/
-  - chmod +x ${PWD}/tests/test.sh
+  - container_id=$(date +%s)
 
-  # Run tests.
-  - ${PWD}/tests/test.sh
+  # Run container in detached state.
+  - echo "Running container"
+  - docker run --detach --privileged -v /sys/fs/cgroup:/sys/fs/cgroup:ro --volume="$PWD":/etc/ansible/roles/role_under_test:ro --name $container_id ${distribution}-${version}:ansible
 
-# notifications:
-#   webhooks: https://galaxy.ansible.com/api/v1/notifications/
+  # Ansible syntax check.
+  - echo "Checking role syntax"
+  - docker exec --tty $container_id env ANSIBLE_FORCE_COLOR=1 ansible-playbook /etc/ansible/roles/role_under_test/tests/travis.yml --syntax-check
+
+  # Test role.
+  - echo "Running the role"
+  - docker exec --tty $container_id env ANSIBLE_FORCE_COLOR=1 ansible-playbook /etc/ansible/roles/role_under_test/tests/travis.yml
+
+  # Test role idempotence.
+  - echo "Testing role idempotence"
+  - idempotence_log=$(mktemp)
+  - docker exec --tty $container_id env ANSIBLE_FORCE_COLOR=1 ansible-playbook /etc/ansible/roles/role_under_test/tests/travis.yml | tee -a $idempotence_log
+  - >
+    tail $idempotence_log
+    | grep -q 'changed=0.*failed=0'
+    && (echo 'Idempotence test: pass' && exit 0)
+    || (echo 'Idempotence test: fail' && exit 1)
+
+notifications:
+  webhooks: https://galaxy.ansible.com/api/v1/notifications/
